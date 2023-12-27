@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <!-- 上传文件 -->
+    <input type="file" id="imageFile" accept="image/*">
+    <!-- 保存被裁剪的原图像，初始样式需要设置 display: none -->
+    <div class="canvasContainer1">
+      <canvas id="canvas1"></canvas>
+    </div>
+    <!-- 保存裁剪区域的图像，初始样式需要设置 display: none -->
+    <div class="canvasContainer2">
+      <canvas id="canvas2"></canvas>
+    </div>
+  
+  <script>
+  const imageFile = document.querySelector('#imageFile');
+  const canvasContainer1 = document.querySelector('.canvasContainer1');
+  const canvasContainer2 = document.querySelector('.canvasContainer2');
+  const canvas1 = document.querySelector('#canvas1');
+  const canvas2 = document.querySelector('#canvas2');
+  const ctx = canvas1.getContext('2d');
+  const ctx2 = canvas2.getContext('2d');
+  
+  const imageBox = new Image(); // 创建一个存放图片的容器
+
+  function init() {
+  imageFile.addEventListener('change', handleFileChange, false); // 监听图片上传事件。
+}
+
+function handleFileChange(e) {
+  const imgFile = e.target.files[0]; // 获取上传的图片对象。
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const imgSrc = e.target.result; // 图片文件的 base64 编码格式。
+    imageBox.src = imgSrc; // 把图片放入 img 容器。
+
+    // 等图片加载完成后，获取图片的宽高。
+    imageBox.onload = function () {
+      const imgWidth = this.width, imgHeight = this.height;
+      console.log(imgWidth, imgHeight);
+    }
+  }
+  if (imgFile) {
+    reader.readAsDataURL(imgFile); // 读取图片文件，读取完成才能获取 result 属性。
+  }
+}
+
+function handleFileChange(e) {
+  const imgFile = e.target.files[0]; // 获取上传的图片对象。
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const imgSrc = e.target.result; // 图片的 base64 编码。
+    imageBox.src = imgSrc; // 把上传的图像放入 img 容器。
+
+    // 图片加载完毕后执行
+    imageBox.onload = function () {
+      // 获取图片的宽高。
+      const imgWidth = this.width, imgHeight = this.height;
+      console.log(imgWidth, imgHeight);
+      
+      // 创建 canvas 画布并绘制图片。
+      generateCanvas(canvasContainer1, canvas1, imgWidth, imgHeight);
+      ctx.drawImage(imageBox, 0, 0, imgWidth, imgHeight);
+    }
+  }
+  if (imgFile) {
+    reader.readAsDataURL(imgFile); // 将当前file读取成DataURL
+  }
+}
+init();
+
+// 根据 width 和 height 创建 canvas 画布。
+function generateCanvas(container, canvas, width, height) {
+  container.width = width + 'px';
+  container.height = height + 'px';
+  canvas.width = width;
+  canvas.height = height;
+  container.style.display = 'block'; // 显示 canvas 区域。
+}
+
+let startPosition = []; // 记录鼠标点击（开始截图）的位置。
+let screenshotData = []; // 保存截取部分的相关信息。
+
+function init() {
+  // 监听鼠标点击事件。
+  canvas1.addEventListener('mousedown', handleMouseDown, false);
+}
+
+// 记录鼠标点击（开始截图）的位置，并监听相关事件。
+function handleMouseDown(e) {
+  startPosition = [e.offsetX, e.offsetY];
+
+  canvas1.addEventListener('mousemove', handleMouseMove, false);
+  canvas1.addEventListener('mouseup', handleMouseUp, false);
+}
+
+// 监听鼠标的偏移量，以计算裁剪区域的宽度和高度。
+function handleMouseMove(e) {
+  // 获取裁剪区域的宽度和高度。
+  const { offsetX, offsetY } = e;
+  const [startX, startY] = startPosition;
+  const [rectWidth, rectHeight] = [offsetX - startX, offsetY - startY];
+  console.log('rect', rectWidth, rectHeight);
+  
+  // 保存裁剪区域的相关信息。
+  screenshotData = [startX, startY, rectWidth, rectHeight];
+}
+
+// 注销监听事件等后续操作。
+function handleMouseUp() {
+  canvas1.removeEventListener('mousemove', handleMouseMove, false);
+  canvas1.removeEventListener('mouseup', handleMouseUp, false);
+}
+const MASKER_OPACITY = 0.4;
+
+function handleMouseMove(e) {
+  // 获取裁剪区域的宽度和高度。
+  const { offsetX, offsetY } = e;
+  const [startX, startY] = startPosition;
+  const [rectWidth, rectHeight] = [offsetX - startX, offsetY - startY];
+  console.log('rect', rectWidth, rectHeight);
+  // 保存裁剪区域的相关信息。
+  screenshotData = [startX, startY, rectWidth, rectHeight];
+  // 再次绘制前，清理 canvas1 画布上的内容。
+  const { width, height } = canvas1;
+  ctx.clearRect(0, 0, width, height);
+  // 在 canvas1 画布上绘制蒙层。
+  drawImageMasker(0, 0, width, height, MASKER_OPACITY);
+  // 绘制截图区域。
+  drawScreenShot(width, height, rectWidth, rectHeight);
+}
+
+// ...
+
+// 绘制图片蒙层，填充范围和颜色，以便区分原图层和裁剪部分图层。
+function drawImageMasker(x, y, width, height, opacity) {
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+  ctx.fillRect(0, 0, width, height);
+}
+
+// 绘制裁剪的矩形区域。
+function drawScreenShot(canWidth, canHeight, rectWidth, rectHeight) {
+  // 在源图像外绘制新图像，只有源图像外的目标图像部分会被显示，源图像是透明的。
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = '#2c2c2c';
+  ctx.fillRect(...startPosition, rectWidth, rectHeight);
+
+  // 在现有画布上绘制新的图形。
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.drawImage(imageBox, 0, 0, canWidth, canHeight, 0, 0, canWidth, canHeight);
+}
+function handleMouseUp() {
+  canvas1.removeEventListener('mousemove', handleMouseMove, false);
+  canvas1.removeEventListener('mouseup', handleMouseUp, false);
+  // 开始绘制截图区域图片。
+  drawScreenshotImage(screenshotData);
+  // 如果裁剪得到新图像后，不希望保留原图像，可以设置以下属性。
+  // canvasContainer1.style.display = 'none';
+}
+
+// 在新容器 canvas2 上绘制新图像。
+function drawScreenshotImage(screenshotData) {
+  // 获取 canvas1 的数据。
+  const data = ctx.getImageData(...screenshotData);
+  // 创建 canvas2 画布。
+  generateCanvas(canvasContainer2, canvas2, screenshotData[2], screenshotData[3]);
+  // 每次绘制前，都先进行清除操作。
+  ctx2.clearRect(...screenshotData);
+  // 将 canvas1 的数据放入 canvas2 中。
+  ctx2.putImageData(data, 0, 0);
+}
+  </script>
+</body>
+</html>
